@@ -1,2 +1,2 @@
-# RL_A3_policy_based
- 
+# RL_tutorial_notebook
+Introductory jupyter notebook for various RL concept
