@@ -17,9 +17,7 @@ for file in files:
     if 'actor-critic' in file:
         if 'ppo' in file:
             continue
-        elif '0.01' in file:
-            continue
-        elif '0.002' in file:
+        if not 'baseline_boostrapping' in file:
             continue
         else:
             file_path = os.path.join(data_dir, file)
@@ -35,7 +33,7 @@ for file in files:
             # combine split_file with ","
             label = ", ".join(split_file)
             plt.plot(ks, avs, '-o', markersize=1, label=label)
-
+    
             plt.xlabel('Episode', fontsize = 12)
             plt.ylabel('Return', fontsize = 12)
             # ax.plot(data, label=file)
@@ -43,12 +41,10 @@ for file in files:
 # Add legend
 ax.legend()
 # add title
-plt.title("Different varients of actor-critic", fontsize = 15, y=1.05)
+plt.title("Actor-critic with different entropy coefficients", fontsize = 15, y=1.05)
 # add subtitle and make it under the title
 plt.suptitle("policy lr=0.0005, critic lr=0.0005", fontsize = 10, y=0.92)
-# Use .fillbetween method to make the plot nicer
-# ...
 #save the plot to ./plots
-plt.savefig('./plots/actor_critic.png')
+plt.savefig('./plots/actor_critic_entropy.png')
 # Show the plot
 # plt.show()

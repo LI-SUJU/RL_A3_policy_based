@@ -123,29 +123,38 @@ def train_actor_critic(env, policy_net, policy_optimizer, value_net, value_optim
             
         # If end_time is within the trajectory, add the value function estimate
         if end_time < T:
-            G += gamma**n
+            V_end = value_net.forward(states[end_time]).item()
+            G += gamma**n * V_end
 
         # Append the calculated G to the list
         Gs.append(G)
         
     Gs = torch.tensor(Gs).view(-1,1)
 
+    # Compute the advantage
+    state_vals = value_net(states).to(device)
+    with torch.no_grad():
+        advantages = Gs - state_vals
         
-    # Compute objective function value L(theta)
-    L_theta = []
-    for log_prob, G in zip(log_probs, Gs):
-        L_theta.append(-log_prob * G * 1/T) # to perform a gradient ascent, compute the negative objective value (minimizing this value-> maximizing the original objective value)
-    L_theta = torch.stack(L_theta).sum() # accumulate all gradient to perform one update for one episode (not at every time step)
-
-    # Update policy
-    policy_optimizer.zero_grad() # reset all gradients to zero
-    L_theta.backward() # compute the gradient
-    policy_optimizer.step() # update the parameters (gradient descent)
+    # Update policy network weights
+    policy_loss = torch.stack([-log_prob * advantage for log_prob, advantage in zip(log_probs, advantages)]).sum() / T
+    entropy_loss = torch.stack([torch.distributions.Categorical(probs).entropy() for probs in policy_net(states)]).sum() / T
+    total_loss = policy_loss + entropy_coef * entropy_loss
+    policy_optimizer.zero_grad()
+    total_loss.backward()
+    policy_optimizer.step() 
+    
+    # Update value network weights
+    loss_fn = nn.MSELoss()
+    value_loss = loss_fn(state_vals, Gs)
+    value_optimizer.zero_grad()
+    value_loss.backward()
+    value_optimizer.step() 
 # Define parameter values
 env_name = 'CartPole-v1'
 num_episodes = 3500
-policy_lr = 5e-4
-critic_lr = 1e-4
+policy_lr = 25e-4
+critic_lr = 5e-4
 # num_seeds = 5 # fit model with 5 different seeds and plot average performance of 5 seeds
 num_seeds = 3 # fit model with 5 different seeds and plot average performance of 5 seeds
 l = num_episodes//100 # use to create x label for plot
@@ -187,7 +196,7 @@ directory = "./data4plot"
 if not os.path.exists(directory):
     os.makedirs(directory)
 # Save the returns array as a numpy file
-np.save(os.path.join(directory, "returns_actor_critic_entropy_0.05_boostrapping.npy"), returns)
+np.save(os.path.join(directory, "returns_actor-critic_entropy-0.05_baseline_boostrapping_policy-lr-0.0025.npy"), returns)
 # Plot the performance over iterations
 # ks = np.arange(l)*100
 # avs = np.mean(returns, axis=0)

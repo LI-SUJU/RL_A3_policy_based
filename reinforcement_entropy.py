@@ -91,7 +91,7 @@ def evaluate_policy(env, policy_net):
     states, actions, rewards, log_probs = generate_episode(env, policy_net)
     return np.sum(rewards)
 
-def train_REINFORCE(env, policy_net, policy_optimizer, gamma=0.99, entropy_coef=0.01):
+def train_REINFORCE(env, policy_net, policy_optimizer, gamma=0.99, entropy_coef=0.05):
     """
     Trains the policy network on a single episode using REINFORCE with entropy regularization
     """
@@ -167,7 +167,7 @@ directory = "./data4plot"
 if not os.path.exists(directory):
     os.makedirs(directory)
 # Save the returns array as a numpy file
-np.save(os.path.join(directory, "returns_reinforcement_entropy_0.01.npy"), returns)
+np.save(os.path.join(directory, "returns_reinforcement_entropy_0.05.npy"), returns)
 
 # Plot the performance over iterations
 ks = np.arange(l)*100

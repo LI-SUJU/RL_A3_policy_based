@@ -93,34 +93,89 @@ def evaluate_policy(env, policy_net):
     states, actions, rewards, log_probs = generate_single_episode(env, policy_net)
     return np.sum(rewards)
 
-def train_PPO(env, policy_net, policy_optimizer, value_net, value_optimizer, num_epochs, clip_val=0.2, gamma=0.99):
+def compute_Gs_per_episode(batch_rews, gamma):
+    # The rewards-to-go (rtg) per episode per batch to return
+    batch_rtgs = []
+    
+    # Iterate through each episode backwards to maintain same order in batch_rtgs
+    for ep_rews in reversed(batch_rews):
+        discounted_reward = 0 # Discounted reward so far
+        
+        for rew in reversed(ep_rews):
+            discounted_reward = rew + discounted_reward * gamma
+            batch_rtgs.insert(0, discounted_reward)
+            
+    # Convert the rewards-to-go into a tensor
+    batch_rtgs = torch.tensor(batch_rtgs, dtype=torch.float)
+
+    return batch_rtgs
+
+
+def generate_multiple_episodes(env, policy_net, max_batch_size=500):
+    """
+    Generates an episode by executing the current policy in the given env
+    """
+    states = []
+    actions = []
+    rewards = []
+    log_probs = []
+    max_t = 1000 # max horizon within one episode
+    i = 0
+    
+    while i < max_batch_size:
+        state, _ = env.reset()
+        reward_per_epi = []
+        for t in range(max_t):
+            state = torch.from_numpy(state).float().unsqueeze(0)
+            probs = policy_net.forward(Variable(state)) # get each action choice probability with the current policy network
+            action = np.random.choice(env.action_space.n, p=np.squeeze(probs.detach().numpy())) # probablistic
+            # action = np.argmax(probs.detach().numpy()) # greedy
+            
+            # compute the log_prob to use this in parameter update
+            log_prob = torch.log(probs.squeeze(0)[action])
+            
+            # append values
+            states.append(state)
+            actions.append(action)
+            log_probs.append(log_prob)
+            
+            # take a selected action
+            state, reward, terminated, truncated, _ = env.step(action)
+            reward_per_epi.append(reward)
+            
+            i += 1
+
+            if terminated | truncated:
+                break
+        rewards.append(reward_per_epi)
+        
+    return states, actions, rewards, log_probs
+
+
+def train_PPO_multi_epi(env, policy_net, policy_optimizer, value_net, value_optimizer, num_epochs, clip_val=0.2, gamma=0.99, max_batch_size=100, entropy_coef=0.1, normalize_ad=True, add_entropy=True):
     """
     Trains the policy network on a single episode using REINFORCE with baseline
     """
 
     # Generate an episode with the current policy network
-    states, actions, rewards, log_probs = generate_single_episode(env, policy_net)
+    states, actions, rewards, log_probs = generate_multiple_episodes(env, policy_net, max_batch_size=max_batch_size)
     T = len(states)
     
     # Create tensors
     states = np.vstack(states).astype(np.float64)
     states = torch.FloatTensor(states).to(device)
     actions = torch.LongTensor(actions).to(device).view(-1,1)
-    rewards = torch.FloatTensor(rewards).to(device).view(-1,1)
     log_probs = torch.FloatTensor(log_probs).to(device).view(-1,1)
 
-    # Compute total discounted return at each time step
-    Gs = []
-    G = 0
-    for t in range(T-1,-1,-1): # iterate in backward order to make the computation easier
-        G = rewards[t] + gamma*G
-        Gs.insert(0,G)
-    Gs = torch.tensor(Gs).view(-1,1)
+    # Compute total discounted return at each time step in each episode
+    Gs = compute_Gs_per_episode(rewards, gamma).view(-1,1)
     
     # Compute the advantage
     state_vals = value_net(states).to(device)
     with torch.no_grad():
         A_k = Gs - state_vals
+    if normalize_ad:
+        A_k = (A_k - A_k.mean()) / (A_k.std() + 1e-10) # Normalize advantages
         
     for _ in range(num_epochs):
         V = value_net(states).to(device)
@@ -138,8 +193,14 @@ def train_PPO(env, policy_net, policy_optimizer, value_net, value_optimizer, num
         surr1 = ratios * A_k
         surr2 = torch.clamp(ratios, 1-clip_val, 1+clip_val) * A_k
         
+        # Caluculate entropy
+        entropy = 0
+        if add_entropy:
+            entropy = torch.distributions.Categorical(probs).entropy()
+            entropy = torch.tensor([[e] for e in entropy])
+        
         # Calculate clipped loss value
-        actor_loss = (-torch.min(surr1, surr2)).mean() # Need negative sign to run Gradient Ascent
+        actor_loss = (-torch.min(surr1, surr2) - entropy_coef * entropy).mean() # Need negative sign to run Gradient Ascent
         
         # Update policy network
         policy_optimizer.zero_grad()
@@ -150,15 +211,15 @@ def train_PPO(env, policy_net, policy_optimizer, value_net, value_optimizer, num
         critic_loss = nn.MSELoss()(V, Gs)
         value_optimizer.zero_grad()
         critic_loss.backward()
-        value_optimizer.step()
+        value_optimizer.step()        
         
     return policy_net, value_net
-    
+
+
 # Define parameter values
 env_name = 'CartPole-v1'
 num_train_ite = 3500
-# num_seeds = 5 # fit model with 5 different seeds and plot average performance of 5 seeds
-num_seeds = 3 # fit model with 5 different seeds and plot average performance of 5 seeds
+num_seeds = 5 # fit model with 5 different seeds and plot average performance of 5 seeds
 num_epochs = 10 # how many times we iterate the entire training dataset passing through the training
 eval_freq = 50 # run evaluation of policy at each eval_freq trials
 eval_epi_index = num_train_ite//eval_freq # use to create x label for plot
@@ -173,6 +234,12 @@ nS = 4
 
 policy_lr = 5e-4 # policy network's learning rate 
 baseline_lr = 1e-4
+# Define parameter values
+returns = np.zeros((num_seeds, eval_epi_index))
+max_batch_size = 100
+entropy_coef = 0.1
+normalize_ad = True
+add_entropy = True
 
 for i in tqdm.tqdm(range(num_seeds)):
     reward_means = []
@@ -185,7 +252,7 @@ for i in tqdm.tqdm(range(num_seeds)):
     
     for m in range(num_train_ite):
         # Train networks with PPO
-        policy_net, value_net = train_PPO(env, policy_net, policy_net_optimizer, value_net, value_net_optimizer, num_epochs, clip_val=clip_val, gamma=gamma)
+        policy_net, value_net = train_PPO_multi_epi(env, policy_net, policy_net_optimizer, value_net, value_net_optimizer, num_epochs, clip_val=clip_val, gamma=gamma, max_batch_size=max_batch_size, entropy_coef=entropy_coef, normalize_ad=normalize_ad, add_entropy=add_entropy)
         if m % eval_freq == 0:
             print("Episode: {}".format(m))
             G = np.zeros(20)
@@ -204,7 +271,7 @@ directory = "./data4plot"
 if not os.path.exists(directory):
     os.makedirs(directory)
 # Save the returns array as a numpy file
-np.save(os.path.join(directory, "returns_actor-critic_ppo.npy"), returns)
+np.save(os.path.join(directory, "returns_actor-critic_ppo_plus.npy"), returns)
 # Plot the performance over iterations
 # x = np.arange(eval_epi_index)*eval_freq
 # avg_returns = np.mean(returns, axis=0)

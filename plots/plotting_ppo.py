@@ -14,41 +14,48 @@ fig, ax = plt.subplots()
 fig.set_size_inches(10, 6)
 # Plot each file as a separate line
 for file in files:
-    if 'actor-critic' in file:
-        if 'ppo' in file:
-            continue
-        elif '0.01' in file:
-            continue
-        elif '0.002' in file:
+    if '0.05_baseline_boostrapping' in file:
+        file_path = os.path.join(data_dir, file)
+        data = np.load(file_path)
+        ks = np.arange(35)*100
+        avs = np.mean(data, axis=0)
+        maxs = np.max(data, axis=0)
+        mins = np.min(data, axis=0)
+        plt.fill_between(ks, mins, maxs, alpha=0.1)
+        label = "actor-critic, entropy-0.05, baseline, bootstrapping"
+        plt.plot(ks, avs, '-o', markersize=1, label=label)
+
+        plt.xlabel('Episode', fontsize = 12)
+        plt.ylabel('Return', fontsize = 12)
+        # ax.plot(data, label=file)
+    elif 'ppo' in file:
+        if 'ppo_plus' in file:
             continue
         else:
             file_path = os.path.join(data_dir, file)
             data = np.load(file_path)
-            ks = np.arange(35)*100
+            ks = np.arange(70)*100
             avs = np.mean(data, axis=0)
             maxs = np.max(data, axis=0)
             mins = np.min(data, axis=0)
+            print(len(ks))
+            print(len(avs))
+            print(len(maxs))
+            print(len(mins))
             plt.fill_between(ks, mins, maxs, alpha=0.1)
-            split_file = (file.split('.')[0] + '.' + file.split('.')[1]).split('_')
-            # remove the first element of the list
-            split_file.pop(0)
-            # combine split_file with ","
-            label = ", ".join(split_file)
+            label = "actor-critic, PPO"
             plt.plot(ks, avs, '-o', markersize=1, label=label)
-
             plt.xlabel('Episode', fontsize = 12)
             plt.ylabel('Return', fontsize = 12)
-            # ax.plot(data, label=file)
+    
 
 # Add legend
 ax.legend()
 # add title
-plt.title("Different varients of actor-critic", fontsize = 15, y=1.05)
-# add subtitle and make it under the title
-plt.suptitle("policy lr=0.0005, critic lr=0.0005", fontsize = 10, y=0.92)
+plt.title("Performance of actor-critic with PPO", fontsize = 15)
 # Use .fillbetween method to make the plot nicer
 # ...
 #save the plot to ./plots
-plt.savefig('./plots/actor_critic.png')
+plt.savefig('./plots/ppo.png')
 # Show the plot
 # plt.show()

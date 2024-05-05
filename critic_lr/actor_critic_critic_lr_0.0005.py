@@ -154,7 +154,7 @@ def train_actor_critic(env, policy_net, policy_optimizer, value_net, value_optim
 env_name = 'CartPole-v1'
 num_episodes = 3500
 policy_lr = 5e-4
-critic_lr = 1e-4
+critic_lr = 5e-4
 # num_seeds = 5 # fit model with 5 different seeds and plot average performance of 5 seeds
 num_seeds = 3 # fit model with 5 different seeds and plot average performance of 5 seeds
 l = num_episodes//100 # use to create x label for plot
@@ -192,22 +192,22 @@ for i in tqdm.tqdm(range(num_seeds)):
     returns[i] = np.array(reward_means)
 
 # Create the directory if it doesn't exist
-directory = "./data4plot"
+directory = "./data4plot/critic_lr"
 if not os.path.exists(directory):
     os.makedirs(directory)
 # Save the returns array as a numpy file
-np.save(os.path.join(directory, "returns_actor_critic_entropy_0.05_baseline_boostrapping.npy"), returns)
+np.save(os.path.join(directory, "returns_actor-critic_entropy-0.05_baseline_boostrapping_critic-lr-0.0005.npy"), returns)
 # Plot the performance over iterations
-ks = np.arange(l)*100
-avs = np.mean(returns, axis=0)
-maxs = np.max(returns, axis=0)
-mins = np.min(returns, axis=0)
+# ks = np.arange(l)*100
+# avs = np.mean(returns, axis=0)
+# maxs = np.max(returns, axis=0)
+# mins = np.min(returns, axis=0)
 
-plt.fill_between(ks, mins, maxs, alpha=0.1)
-plt.plot(ks, avs, '-o', markersize=1)
+# plt.fill_between(ks, mins, maxs, alpha=0.1)
+# plt.plot(ks, avs, '-o', markersize=1)
 
-plt.xlabel('Episode', fontsize = 15)
-plt.ylabel('Return', fontsize = 15)
+# plt.xlabel('Episode', fontsize = 15)
+# plt.ylabel('Return', fontsize = 15)
 
-plt.title("REINFORCE Learning Curve", fontsize = 24)
-plt.show()
+# plt.title("REINFORCE Learning Curve", fontsize = 24)
+# plt.show()
