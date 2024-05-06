@@ -3,6 +3,8 @@ import os
 import matplotlib.pyplot as plt
 import numpy as np
 
+from plotHelper import smooth
+
 # Get the list of files in the directory
 data_dir = './data4plot'
 files = os.listdir(data_dir)
@@ -17,7 +19,7 @@ for file in files:
     if 'actor-critic' in file:
         if 'ppo' in file:
             continue
-        if not 'baseline_boostrapping' in file:
+        if not 'baseline_bootstrapping' in file:
             continue
         else:
             file_path = os.path.join(data_dir, file)
@@ -32,7 +34,8 @@ for file in files:
             split_file.pop(0)
             # combine split_file with ","
             label = ", ".join(split_file)
-            plt.plot(ks, avs, '-o', markersize=1, label=label)
+            # plt.plot(ks, avs, '-o', markersize=1, label=label)
+            plt.plot(ks, smooth(avs, 10), '-o', markersize=1, label=label)
     
             plt.xlabel('Episode', fontsize = 12)
             plt.ylabel('Return', fontsize = 12)
@@ -41,9 +44,9 @@ for file in files:
 # Add legend
 ax.legend()
 # add title
-plt.title("Actor-critic with different entropy coefficients", fontsize = 15, y=1.05)
+plt.title("Actor-Critic with different entropy coefficients", fontsize = 15, y=1.05)
 # add subtitle and make it under the title
-plt.suptitle("policy lr=0.0005, critic lr=0.0005", fontsize = 10, y=0.92)
+plt.suptitle("policy net lr=0.0005, critic net lr=0.0005", fontsize = 10, y=0.92)
 #save the plot to ./plots
 plt.savefig('./plots/actor_critic_entropy.png')
 # Show the plot

@@ -3,6 +3,8 @@ import os
 import matplotlib.pyplot as plt
 import numpy as np
 
+from plotHelper import smooth
+
 # Get the list of files in the directory
 data_dir = './data4plot'
 files = os.listdir(data_dir)
@@ -27,7 +29,8 @@ for file in files:
             label = split_file[1]
         else:
             label = split_file[3] + ', policy lr=0.0005, baseline lr=0.0005'
-        plt.plot(ks, avs, '-o', markersize=1, label=label)
+        # plt.plot(ks, avs, '-o', markersize=1, label=label)
+        plt.plot(ks, smooth(avs, 10), '-o', markersize=1, label=label)
 
         plt.xlabel('Episode', fontsize = 12)
         plt.ylabel('Return', fontsize = 12)

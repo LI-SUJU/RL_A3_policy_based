@@ -3,6 +3,8 @@ import os
 import matplotlib.pyplot as plt
 import numpy as np
 
+from plotHelper import smooth
+
 # Get the list of files in the directory
 data_dir = './data4plot'
 files = os.listdir(data_dir)
@@ -34,7 +36,9 @@ for file in files:
             split_file.pop(0)
             # combine split_file with ","
             label = ", ".join(split_file)
-            plt.plot(ks, avs, '-o', markersize=1, label=label)
+            # plt.plot(ks, avs, '-o', markersize=1, label=label)
+
+            plt.plot(ks, smooth(avs, 10), '-o', markersize=1, label=label)
 
             plt.xlabel('Episode', fontsize = 12)
             plt.ylabel('Return', fontsize = 12)
@@ -43,9 +47,9 @@ for file in files:
 # Add legend
 ax.legend()
 # add title
-plt.title("Different varients of actor-critic", fontsize = 15, y=1.05)
+plt.title("Different varients of Actor-Critic", fontsize = 15, y=1.05)
 # add subtitle and make it under the title
-plt.suptitle("policy lr=0.0005, critic lr=0.0005", fontsize = 10, y=0.92)
+plt.suptitle("policy net lr=0.0005, critic net lr=0.0005", fontsize = 10, y=0.92)
 # Use .fillbetween method to make the plot nicer
 # ...
 #save the plot to ./plots
